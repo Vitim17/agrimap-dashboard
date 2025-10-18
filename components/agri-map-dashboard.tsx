@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { Leaf, CloudSun, AlertTriangle, TrendingUp, Thermometer, Upload, Info } from "lucide-react";
+import { Leaf, CloudSun, AlertTriangle, TrendingUp, Thermometer, Upload, Info, Droplets } from "lucide-react";
 import { getNDVI, getWeather, getAlerts, getYield, getOpenWeatherData } from "../src/api/agriMapApi";
 import { AlertasLavoura } from "./AlertasLavoura";
 import "leaflet/dist/leaflet.css";
@@ -46,7 +46,56 @@ interface YieldData {
   produtividade: number;
 }
 
-// Componente de Card animado
+// Componente Progress Ring para indicadores
+function ProgressRing({ 
+  value, 
+  maxValue, 
+  size = 120, 
+  strokeWidth = 8,
+  color = "#10b981"
+}: {
+  value: number;
+  maxValue: number;
+  size?: number;
+  strokeWidth?: number;
+  color?: string;
+}) {
+  const percentage = Math.min((value / maxValue) * 100, 100);
+  const radius = (size - strokeWidth) / 2;
+  const circumference = radius * 2 * Math.PI;
+  const offset = circumference - (percentage / 100) * circumference;
+
+  return (
+    <svg width={size} height={size} className="transform -rotate-90">
+      {/* Background circle */}
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        stroke="#E5E7EB"
+        strokeWidth={strokeWidth}
+        fill="none"
+      />
+      {/* Progress circle */}
+      <motion.circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        stroke={color}
+        strokeWidth={strokeWidth}
+        fill="none"
+        strokeDasharray={circumference}
+        strokeDashoffset={offset}
+        strokeLinecap="round"
+        initial={{ strokeDashoffset: circumference }}
+        animate={{ strokeDashoffset: offset }}
+        transition={{ duration: 1, ease: "easeInOut" }}
+      />
+    </svg>
+  );
+}
+
+// Componente de Card animado com Progress Ring
 function DataCard({ 
   title, 
   value, 
@@ -54,7 +103,10 @@ function DataCard({
   icon,
   iconBgColor = "bg-emerald-100",
   valueColor = "text-emerald-700",
-  delay = 0
+  delay = 0,
+  showProgress = false,
+  maxValue = 100,
+  progressColor = "#10b981"
 }: { 
   title: string;
   value: string | number;
@@ -63,38 +115,78 @@ function DataCard({
   iconBgColor?: string;
   valueColor?: string;
   delay?: number;
+  showProgress?: boolean;
+  maxValue?: number;
+  progressColor?: string;
 }) {
+  const numericValue = typeof value === 'string' ? parseFloat(value) || 0 : value;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay }}
       whileHover={{ scale: 1.02, y: -2 }}
-      className="bg-white rounded-2xl shadow-md hover:shadow-lg transition-all duration-300"
+      className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 border border-gray-100"
     >
       <Card className="border-0 shadow-none">
-        <CardContent className="flex items-center gap-4 p-4">
-          {icon && (
-            <motion.div 
-              className={`p-3 ${iconBgColor} rounded-full`}
-              whileHover={{ rotate: 360 }}
-              transition={{ duration: 0.6 }}
-            >
-              {icon}
-            </motion.div>
+        <CardContent className="p-6">
+          {showProgress ? (
+            // Layout com Progress Ring
+            <div className="flex flex-col items-center">
+              <div className="relative">
+                <ProgressRing 
+                  value={numericValue} 
+                  maxValue={maxValue}
+                  size={140}
+                  strokeWidth={10}
+                  color={progressColor}
+                />
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  {icon && (
+                    <div className={`mb-2 ${iconBgColor} p-3 rounded-full`}>
+                      {icon}
+                    </div>
+                  )}
+                  <motion.h3 
+                    className={`text-3xl font-bold ${valueColor}`}
+                    key={value}
+                    initial={{ scale: 1.3, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    {value ?? "—"}{suffix}
+                  </motion.h3>
+                </div>
+              </div>
+              <p className="text-sm font-semibold text-gray-700 mt-3">{title}</p>
+            </div>
+          ) : (
+            // Layout tradicional (sem progress ring)
+            <div className="flex items-center gap-4">
+              {icon && (
+                <motion.div 
+                  className={`p-4 ${iconBgColor} rounded-xl flex items-center justify-center`}
+                  whileHover={{ rotate: 360 }}
+                  transition={{ duration: 0.6 }}
+                >
+                  {icon}
+                </motion.div>
+              )}
+              <div className="flex-1">
+                <p className="text-sm font-medium text-gray-600 mb-1">{title}</p>
+                <motion.h3 
+                  className={`text-3xl font-bold ${valueColor}`}
+                  key={value}
+                  initial={{ scale: 1.2, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  {value ?? "—"}{suffix}
+                </motion.h3>
+              </div>
+            </div>
           )}
-          <div>
-            <p className="text-sm text-gray-500">{title}</p>
-            <motion.h3 
-              className={`text-2xl font-bold ${valueColor}`}
-              key={value}
-              initial={{ scale: 1.2, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ duration: 0.3 }}
-            >
-              {value ?? "—"}{suffix}
-            </motion.h3>
-          </div>
         </CardContent>
       </Card>
     </motion.div>
@@ -221,28 +313,28 @@ export default function AgriMapDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-green-50 to-green-100 text-gray-800 transition-all">
+    <div className="min-h-screen bg-[#F9F9F9] text-gray-800 transition-all">
       {/* Header */}
-      <header className="flex items-center justify-between px-8 py-4 bg-green-700 text-white shadow-md">
+      <header className="flex items-center justify-between px-8 py-5 bg-green-700 text-white shadow-lg">
         <div className="flex items-center gap-4">
-          <h1 className="text-2xl font-bold">🌾 AgriMap Dashboard</h1>
+          <h1 className="text-2xl font-bold tracking-tight">🌾 AgriMap Dashboard</h1>
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ duration: 0.3, delay: 0.2 }}
-            className="flex items-center gap-2 bg-blue-500 px-3 py-1 rounded-full text-xs font-semibold"
+            className="flex items-center gap-2 bg-blue-500 px-3 py-1.5 rounded-full text-xs font-semibold shadow-md"
           >
             <CloudSun className="w-4 h-4" />
             OpenWeather Ativo
           </motion.div>
         </div>
-        <Button variant="secondary" className="bg-white text-green-700 font-semibold hover:bg-green-100">
+        <Button variant="secondary" className="bg-white text-green-700 font-semibold hover:bg-green-50 shadow-md px-6">
           + Nova Lavoura
         </Button>
       </header>
 
       {/* Main grid */}
-      <main className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6">
+      <main className="grid grid-cols-1 md:grid-cols-3 gap-8 p-8">
         {/* Left side - Map */}
         <section className="md:col-span-2 bg-white rounded-2xl shadow-lg overflow-hidden">
           <CardHeader className="p-4 border-b">
@@ -295,11 +387,11 @@ export default function AgriMapDashboard() {
                 onSelectLavoura={handleSelectLavoura}
               />
             ) : (
-              <div className="flex items-center justify-center h-[500px] bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl">
+              <div className="flex items-center justify-center h-[700px] bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl">
                 <div className="text-center">
-                  <Upload className="w-16 h-16 text-gray-400 mx-auto mb-3" />
-                  <p className="text-gray-500 font-medium">Faça upload de um arquivo</p>
-                  <p className="text-sm text-gray-400 mt-1">GeoJSON ou Shapefile (.zip)</p>
+                  <Upload className="w-20 h-20 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-600 font-semibold text-lg">Faça upload de um arquivo</p>
+                  <p className="text-sm text-gray-400 mt-2">GeoJSON ou Shapefile (.zip)</p>
                 </div>
               </div>
             )}
@@ -307,43 +399,58 @@ export default function AgriMapDashboard() {
         </section>
 
         {/* Right side - Cards */}
-        <section className={`flex flex-col gap-4 transition-opacity duration-700 ${fade ? "opacity-50" : "opacity-100"}`}>
+        <section className={`flex flex-col gap-6 transition-opacity duration-700 ${fade ? "opacity-50" : "opacity-100"}`}>
+          {/* NDVI com Progress Ring */}
           <DataCard
             title="NDVI Atual"
             value={selectedFarmData?.ndvi ?? ndviData?.ndvi_atual ?? "—"}
-            icon={<Leaf className="text-green-700" />}
-            iconBgColor="bg-green-100"
-            valueColor="text-green-700"
+            icon={<Leaf className="text-green-600" />}
+            iconBgColor="bg-green-50"
+            valueColor="text-green-600"
             delay={0}
+            showProgress={true}
+            maxValue={1}
+            progressColor="#16a34a"
           />
 
+          {/* Umidade com Progress Ring */}
           <DataCard
             title="Umidade do Solo"
             value={selectedFarmData?.umidade ?? weather?.umidade_solo ?? "—"}
             suffix="%"
-            icon={<CloudSun className="text-blue-700" />}
-            iconBgColor="bg-blue-100"
-            valueColor="text-blue-700"
+            icon={<Droplets className="text-blue-600" />}
+            iconBgColor="bg-blue-50"
+            valueColor="text-blue-600"
             delay={0.1}
+            showProgress={true}
+            maxValue={100}
+            progressColor="#2563eb"
           />
 
+          {/* Temperatura sem Progress Ring */}
           <DataCard
             title="Temperatura"
             value={selectedFarmData?.temperatura ?? weather?.temperatura ?? "—"}
             suffix="°C"
-            icon={<Thermometer className="text-orange-700" />}
-            iconBgColor="bg-orange-100"
-            valueColor="text-orange-700"
+            icon={<Thermometer className="text-orange-600" />}
+            iconBgColor="bg-orange-50"
+            valueColor="text-orange-600"
             delay={0.2}
           />
 
+          {/* Card de Alertas com destaque visual */}
           <motion.div
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.3 }}
-            className="bg-white p-4 rounded-2xl shadow-md"
+            className="bg-white p-6 rounded-2xl shadow-md border-2 border-yellow-200 hover:shadow-xl transition-all duration-300"
           >
-            <h3 className="font-semibold text-gray-800 mb-3">Alertas</h3>
+            <div className="flex items-center gap-2 mb-4">
+              <div className="p-2 bg-yellow-100 rounded-lg">
+                <AlertTriangle className="w-5 h-5 text-yellow-600" />
+              </div>
+              <h3 className="font-bold text-gray-800 text-lg">Alertas da Lavoura</h3>
+            </div>
             <AlertasLavoura 
               dados={{
                 ndvi: selectedFarmData?.ndvi ?? ndviData?.ndvi_atual,
@@ -356,75 +463,119 @@ export default function AgriMapDashboard() {
       </main>
 
       {/* Bottom charts */}
-      <section className={`grid grid-cols-1 md:grid-cols-2 gap-6 p-6 transition-opacity duration-700 ${fade ? "opacity-50" : "opacity-100"}`}>
+      <section className={`grid grid-cols-1 md:grid-cols-2 gap-8 px-8 pb-8 transition-opacity duration-700 ${fade ? "opacity-50" : "opacity-100"}`}>
+        {/* Gráfico NDVI */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.4 }}
         >
-          <Card className="shadow-md hover:shadow-lg transition-shadow duration-300">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-green-700">
-                <TrendingUp className="w-5 h-5" /> Histórico NDVI
+          <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300 border border-gray-100">
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center gap-2 text-green-600 text-lg">
+                <TrendingUp className="w-6 h-6" /> Histórico NDVI
               </CardTitle>
             </CardHeader>
             <CardContent className="h-[250px]">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={ndviData?.historico || []}>
-                  <XAxis dataKey="data" />
-                  <YAxis domain={[0, 1]} />
-                  <Tooltip />
-                  <Line type="monotone" dataKey="ndvi" stroke="#16a34a" strokeWidth={3} dot />
+                  <XAxis dataKey="data" stroke="#6b7280" style={{ fontSize: '12px' }} />
+                  <YAxis domain={[0, 1]} stroke="#6b7280" style={{ fontSize: '12px' }} />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#fff', 
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
+                    }}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="ndvi" 
+                    stroke="#16a34a" 
+                    strokeWidth={3} 
+                    dot={{ fill: '#16a34a', r: 5 }}
+                    activeDot={{ r: 7 }}
+                  />
                 </LineChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
         </motion.div>
 
+        {/* Card Precipitação */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.5 }}
         >
-          <Card className="shadow-md hover:shadow-lg transition-shadow duration-300">
-            <CardHeader>
-              <CardTitle className="text-blue-700">Precipitação (mm)</CardTitle>
+          <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300 border border-gray-100 bg-gradient-to-br from-blue-50 to-white">
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center gap-2 text-blue-600 text-lg">
+                <Droplets className="w-6 h-6" /> Precipitação (mm)
+              </CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col justify-center items-center h-[250px]">
-              <motion.p 
-                className="text-4xl font-bold text-blue-700"
+              <motion.div 
+                className="text-center"
                 key={selectedFarmData?.chuva ?? weather?.chuva_semana}
                 initial={{ scale: 1.2, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ duration: 0.4 }}
               >
-                {selectedFarmData?.chuva ?? weather?.chuva_semana ?? "—"} mm
-              </motion.p>
-              <p className="text-sm text-gray-500 mt-2">
+                <p className="text-6xl font-bold text-blue-600">
+                  {selectedFarmData?.chuva ?? weather?.chuva_semana ?? "—"}
+                </p>
+                <p className="text-2xl font-semibold text-blue-400 mt-2">mm</p>
+              </motion.div>
+              <p className="text-sm font-medium text-gray-600 mt-4">
                 {selectedFarmData ? "Área selecionada" : "Chuva acumulada na semana"}
               </p>
             </CardContent>
           </Card>
         </motion.div>
 
+        {/* Gráfico de Produtividade */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.6 }}
         >
-          <Card className="shadow-md hover:shadow-lg transition-shadow duration-300">
-            <CardHeader>
-              <CardTitle className="text-amber-700">Histórico de Produtividade</CardTitle>
+          <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300 border border-gray-100">
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center gap-2 text-amber-600 text-lg">
+                <TrendingUp className="w-6 h-6" /> Histórico de Produtividade
+              </CardTitle>
             </CardHeader>
             <CardContent className="h-[250px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={yieldData}>
-                  <XAxis dataKey="ano" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="produtividade" fill="#d97706" barSize={40} />
-                </BarChart>
-              </ResponsiveContainer>
+              {yieldData && yieldData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={yieldData}>
+                    <XAxis dataKey="ano" stroke="#6b7280" style={{ fontSize: '12px' }} />
+                    <YAxis stroke="#6b7280" style={{ fontSize: '12px' }} />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: '#fff', 
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '8px',
+                        boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
+                      }}
+                    />
+                    <Bar 
+                      dataKey="produtividade" 
+                      fill="#d97706" 
+                      barSize={40}
+                      radius={[8, 8, 0, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full">
+                  <TrendingUp className="w-16 h-16 text-gray-300 mb-3" />
+                  <p className="text-gray-500 font-semibold text-lg">Dados em Coleta</p>
+                  <p className="text-gray-400 text-sm mt-2">Histórico de Produtividade em Breve</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </motion.div>

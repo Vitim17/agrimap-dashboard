@@ -223,7 +223,7 @@ export default function MapaLavouras({ lavouras, onSelectLavoura, alertasCritico
       <MapContainer
         center={[-15.78, -47.93]}
         zoom={9}
-        style={{ height: "500px", width: "100%" }}
+        style={{ height: "700px", width: "100%" }}
       >
         <TileLayer
           attribution='&copy; OpenStreetMap'
