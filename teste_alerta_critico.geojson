@@ -1,0 +1,52 @@
+{
+  "type": "FeatureCollection",
+  "name": "Teste com Alerta Crítico",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "nome": "Área com Problema - NDVI Baixo",
+        "area_ha": 40.0,
+        "cultura": "Soja",
+        "ndvi": 0.30,
+        "status": "crítico",
+        "problema": "Estresse hídrico severo"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-47.9400, -15.7850],
+            [-47.9350, -15.7850],
+            [-47.9350, -15.7900],
+            [-47.9400, -15.7900],
+            [-47.9400, -15.7850]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "nome": "Área Saudável",
+        "area_ha": 35.0,
+        "cultura": "Milho",
+        "ndvi": 0.85,
+        "status": "excelente"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-47.9350, -15.7850],
+            [-47.9300, -15.7850],
+            [-47.9300, -15.7900],
+            [-47.9350, -15.7900],
+            [-47.9350, -15.7850]
+          ]
+        ]
+      }
+    }
+  ]
+}
+

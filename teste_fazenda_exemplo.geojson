@@ -1,0 +1,99 @@
+{
+  "type": "FeatureCollection",
+  "name": "Fazenda Boa Vista - Teste",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "nome": "Talhão A - Soja",
+        "area_ha": 85.5,
+        "cultura": "Soja",
+        "ndvi": 0.78,
+        "data_plantio": "2024-10-15",
+        "status": "saudável"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-47.9500, -15.7800],
+            [-47.9400, -15.7800],
+            [-47.9400, -15.7900],
+            [-47.9500, -15.7900],
+            [-47.9500, -15.7800]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "nome": "Talhão B - Milho",
+        "area_ha": 62.3,
+        "cultura": "Milho",
+        "ndvi": 0.45,
+        "data_plantio": "2024-11-01",
+        "status": "atenção"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-47.9400, -15.7800],
+            [-47.9300, -15.7800],
+            [-47.9300, -15.7900],
+            [-47.9400, -15.7900],
+            [-47.9400, -15.7800]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "nome": "Talhão C - Algodão",
+        "area_ha": 120.8,
+        "cultura": "Algodão",
+        "ndvi": 0.82,
+        "data_plantio": "2024-09-20",
+        "status": "excelente"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-47.9500, -15.7900],
+            [-47.9400, -15.7900],
+            [-47.9400, -15.8000],
+            [-47.9500, -15.8000],
+            [-47.9500, -15.7900]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "nome": "Talhão D - Pastagem",
+        "area_ha": 45.2,
+        "cultura": "Pastagem",
+        "ndvi": 0.35,
+        "data_plantio": "2023-05-10",
+        "status": "crítico"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-47.9400, -15.7900],
+            [-47.9300, -15.7900],
+            [-47.9300, -15.8000],
+            [-47.9400, -15.8000],
+            [-47.9400, -15.7900]
+          ]
+        ]
+      }
+    }
+  ]
+}
+

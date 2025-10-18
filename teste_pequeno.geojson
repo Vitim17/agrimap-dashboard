@@ -1,0 +1,28 @@
+{
+  "type": "FeatureCollection",
+  "name": "Teste Simples - Uma Área",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "nome": "Área de Teste Única",
+        "area_ha": 25.5,
+        "cultura": "Teste",
+        "ndvi": 0.65
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-47.9300, -15.7850],
+            [-47.9250, -15.7850],
+            [-47.9250, -15.7900],
+            [-47.9300, -15.7900],
+            [-47.9300, -15.7850]
+          ]
+        ]
+      }
+    }
+  ]
+}
+

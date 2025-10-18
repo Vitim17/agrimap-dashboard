@@ -1,0 +1,30 @@
+{
+  "type": "FeatureCollection",
+  "name": "Fazenda Grande - Mato Grosso",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "nome": "Fazenda Esperança - MT",
+        "area_ha": 500.0,
+        "cultura": "Soja",
+        "ndvi": 0.75,
+        "municipio": "Sorriso",
+        "estado": "MT"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-55.7000, -12.5400],
+            [-55.6800, -12.5400],
+            [-55.6800, -12.5600],
+            [-55.7000, -12.5600],
+            [-55.7000, -12.5400]
+          ]
+        ]
+      }
+    }
+  ]
+}
+
