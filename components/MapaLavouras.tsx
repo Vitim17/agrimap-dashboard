@@ -3,11 +3,35 @@ import { motion } from "framer-motion";
 import "leaflet/dist/leaflet.css";
 import { useState, useEffect } from "react";
 import * as L from "leaflet";
-import { Layers, Satellite, Image as ImageIcon } from "lucide-react";
+import { Layers, Satellite, Image as ImageIcon, CloudRain } from "lucide-react";
+
+/**
+ * Calcula o Índice de Risco Agrícola (IRA)
+ * Score de 0-100 baseado em múltiplos fatores
+ */
+const calcularIRA = (ndvi: number, umidade: number, chuva: number, temp: number) => {
+  let score = 0;
+
+  // NDVI (peso alto - 40%)
+  score += ndvi * 40;
+
+  // Umidade (peso médio - 25%)
+  score += (umidade / 100) * 25;
+
+  // Chuva (ideal entre 10 e 40 mm - 20%)
+  score += Math.min(1, chuva / 40) * 20;
+
+  // Temperatura (ideal entre 20°C e 30°C - 15%)
+  const fatorTemp = temp < 15 || temp > 35 ? 0.3 : 1 - Math.abs(25 - temp) / 25;
+  score += fatorTemp * 15;
+
+  return Math.round(score);
+};
 
 interface MapaLavourasProps {
   lavouras: any[];
   onSelectLavoura?: (data: any) => void;
+  fazendaParaFocar?: any; // GeoJSON da fazenda para centralizar
   alertasCriticos?: {
     nome: string;
     ndvi?: number;
@@ -17,9 +41,10 @@ interface MapaLavourasProps {
 }
 
 // Componente para controlar zoom automático
-function MapController({ lavouras }: { lavouras: any[] }) {
+function MapController({ lavouras, fazendaParaFocar }: { lavouras: any[]; fazendaParaFocar?: any }) {
   const map = useMap();
 
+  // Effect para zoom inicial em todas as lavouras
   useEffect(() => {
     if (lavouras && lavouras.length > 0) {
       try {
@@ -56,6 +81,27 @@ function MapController({ lavouras }: { lavouras: any[] }) {
       }
     }
   }, [lavouras, map]);
+
+  // Effect para focar em uma fazenda específica
+  useEffect(() => {
+    if (fazendaParaFocar) {
+      try {
+        const geoJsonLayer = L.geoJSON(fazendaParaFocar);
+        const bounds = geoJsonLayer.getBounds();
+        
+        if (bounds.isValid()) {
+          console.log('🎯 Focando em fazenda:', fazendaParaFocar.properties?.nome);
+          map.flyToBounds(bounds, { 
+            maxZoom: 14,
+            padding: [50, 50],
+            duration: 1.5 
+          });
+        }
+      } catch (error) {
+        console.error('Erro ao focar em fazenda:', error);
+      }
+    }
+  }, [fazendaParaFocar, map]);
 
   return null;
 }
@@ -129,12 +175,23 @@ function SatelliteImageOverlay({
   );
 }
 
-export default function MapaLavouras({ lavouras, onSelectLavoura, alertasCriticos = [] }: MapaLavourasProps) {
+export default function MapaLavouras({ lavouras, onSelectLavoura, fazendaParaFocar, alertasCriticos = [] }: MapaLavourasProps) {
   const [hovered, setHovered] = useState<string | null>(null);
   const [active, setActive] = useState<string | null>(null);
   const [visualizationType, setVisualizationType] = useState<string>('none');
+  const [showPrecipitation, setShowPrecipitation] = useState<boolean>(false);
 
-  const getColorByNDVI = (ndvi: number) => {
+  // Cor baseada no IRA (mais intuitivo)
+  const getColorByIRA = (ira: number | null) => {
+    if (ira === null) return "#666666"; // cinza para sem dados
+    if (ira < 40) return "#dc2626"; // vermelho (crítico)
+    if (ira < 70) return "#eab308"; // amarelo (atenção)
+    return "#16a34a"; // verde (ideal)
+  };
+
+  // Cor baseada no NDVI (fallback)
+  const getColorByNDVI = (ndvi: number | null) => {
+    if (ndvi === null) return "#666666"; // cinza para sem dados
     if (ndvi >= 0.75) return "#1B5E20"; // verde escuro
     if (ndvi >= 0.5) return "#F9A825"; // amarelo médio
     return "#C62828"; // vermelho
@@ -147,67 +204,173 @@ export default function MapaLavouras({ lavouras, onSelectLavoura, alertasCritico
 
   const onEachFeature = (feature: any, layer: any) => {
     const props = feature.properties;
-    const ndvi = props.ndvi ?? parseFloat((Math.random() * 0.5 + 0.5).toFixed(2));
-    const temAlerta = temAlertaCritico(props.nome, ndvi);
+    const ndvi = props.ndvi ?? null;
+    const ira = props.ira ?? null;
 
-    // Estilo inicial
+    // Adiciona classes CSS baseado no IRA ou NDVI
+    if (ira !== null) {
+      if (ira < 40) {
+        layer._path?.classList.add("alerta-critico");
+      } else if (ira < 70) {
+        layer._path?.classList.add("alerta-moderado");
+      }
+    } else if (ndvi !== null) {
+      if (ndvi < 0.5) {
+        layer._path?.classList.add("alerta-critico");
+      } else if (ndvi < 0.7) {
+        layer._path?.classList.add("alerta-moderado");
+      }
+    }
+
+    // Estilo inicial - prioriza IRA, fallback para NDVI
     const estiloBase = {
-      color: temAlerta ? "#DC2626" : getColorByNDVI(ndvi),
-      weight: temAlerta ? 4 : 2,
-      fillOpacity: 0.5,
-      dashArray: temAlerta ? "10, 5" : "",
+      color: ira !== null ? getColorByIRA(ira) : (ndvi !== null ? getColorByNDVI(ndvi) : "#666666"),
+      weight: 3,
+      fillOpacity: 0.35,
     };
 
     layer.setStyle(estiloBase);
 
-    // Animação piscante para alertas críticos
-    if (temAlerta) {
-      let piscar = true;
-      const intervalo = setInterval(() => {
-        if (layer._map) {
-          layer.setStyle({
-            ...estiloBase,
-            weight: piscar ? 6 : 4,
-            color: piscar ? "#EF4444" : "#DC2626",
-            fillOpacity: piscar ? 0.4 : 0.6,
-          });
-          piscar = !piscar;
+    // Tooltip - prioriza IRA
+    let tooltipContent = `<strong>${props.nome}</strong>`;
+    if (ira !== null) {
+      tooltipContent += `<br>IRA: ${ira} pontos`;
+    } else if (ndvi !== null) {
+      tooltipContent += `<br>NDVI: ${ndvi.toFixed(2)}`;
         } else {
-          clearInterval(intervalo);
-        }
-      }, 800);
+      tooltipContent += `<br>Clique para mais informações`;
     }
+    
+    layer.bindTooltip(tooltipContent, { direction: "top" });
 
     layer.on({
       mouseover: () => {
         setHovered(props.nome);
         layer.setStyle({
-          weight: temAlerta ? 6 : 4,
+          weight: 4,
           fillOpacity: 0.7,
-          color: temAlerta ? "#EF4444" : "#2E7D32",
+          color: "#2E7D32",
         });
       },
       mouseout: () => {
         setHovered(null);
         if (active !== props.nome) {
           layer.setStyle({
-            weight: temAlerta ? 4 : 2,
-            fillOpacity: 0.5,
-            color: temAlerta ? "#DC2626" : getColorByNDVI(ndvi),
+            weight: 3,
+            fillOpacity: 0.35,
+            color: ira !== null ? getColorByIRA(ira) : (ndvi !== null ? getColorByNDVI(ndvi) : "#666666"),
           });
         }
       },
-      click: () => {
+      click: async () => {
         setActive(props.nome);
+        layer.bringToFront(); // Traz o polígono clicado para frente
+        
         if (onSelectLavoura) {
-          onSelectLavoura({
+          // Dados base do GeoJSON
+          const dadosBase: any = {
+            id: props.id,
             nome: props.nome,
-            area: props.area_ha,
-            ndvi: ndvi,
-            umidade: Math.floor(Math.random() * 40 + 60),
-            chuva: (Math.random() * 20).toFixed(1),
-            temperatura: Math.floor(Math.random() * 10 + 20),
-          });
+            area: props.area_ha || props.area,
+            ndvi: props.ndvi,
+            umidade: props.umidade,
+            chuva: props.chuva,
+            temperatura: props.temperatura,
+            latitude: props.latitude,
+            longitude: props.longitude,
+          };
+
+          console.log(`📍 Fazenda selecionada:`, dadosBase);
+
+          try {
+            // 1. Busca histórico de NDVI (se houver ID)
+            if (props.id) {
+              console.log(`🔍 Buscando histórico NDVI da fazenda ${props.id}...`);
+              
+              const historicoResponse = await fetch(`/api/lavouras/${props.id}/historico`);
+              
+              if (historicoResponse.ok) {
+                const historicoNDVI = await historicoResponse.json();
+                console.log(`✅ Histórico NDVI carregado:`, historicoNDVI);
+                dadosBase.historicoNDVI = historicoNDVI;
+              } else {
+                console.warn('⚠️ Histórico NDVI não disponível');
+              }
+            }
+
+            // 2. Busca dados climáticos do OpenWeather (se houver coordenadas)
+            if (props.latitude && props.longitude) {
+              console.log(`🌤️ Buscando dados climáticos (lat: ${props.latitude}, lon: ${props.longitude})...`);
+              
+              const OPENWEATHER_KEY = process.env.NEXT_PUBLIC_OPENWEATHER_API_KEY;
+              
+              if (OPENWEATHER_KEY) {
+                const climaUrl = `https://api.openweathermap.org/data/2.5/forecast?lat=${props.latitude}&lon=${props.longitude}&appid=${OPENWEATHER_KEY}&units=metric&lang=pt_br`;
+                
+                const climaResponse = await fetch(climaUrl);
+                
+                if (climaResponse.ok) {
+                  const climaData = await climaResponse.json();
+                  
+                  // Processa dados das próximas 24h (8 registros de 3h cada)
+                  const proximasHoras = climaData.list.slice(0, 8);
+                  
+                  const tempMedia = (
+                    proximasHoras.reduce((acc: number, item: any) => acc + item.main.temp, 0) / 
+                    proximasHoras.length
+                  ).toFixed(1);
+                  
+                  const chuvaTotal = proximasHoras.reduce(
+                    (acc: number, item: any) => acc + (item.rain?.['3h'] || 0), 
+                    0
+                  ).toFixed(1);
+                  
+                  const condicao = proximasHoras[0]?.weather[0]?.description || 'N/A';
+                  const umidadeAtual = proximasHoras[0]?.main?.humidity;
+                  
+                  dadosBase.clima = {
+                    temperatura: parseFloat(tempMedia),
+                    chuva: parseFloat(chuvaTotal),
+                    condicao: condicao,
+                    umidade: umidadeAtual,
+                  };
+                  
+                  // Atualiza dados base com clima real (se não existirem)
+                  if (!dadosBase.temperatura) dadosBase.temperatura = parseFloat(tempMedia);
+                  if (!dadosBase.chuva) dadosBase.chuva = parseFloat(chuvaTotal);
+                  if (!dadosBase.umidade) dadosBase.umidade = umidadeAtual;
+                  
+                  console.log(`✅ Dados climáticos carregados:`, dadosBase.clima);
+                } else {
+                  console.warn('⚠️ Erro ao buscar dados do OpenWeather:', climaResponse.status);
+                }
+              } else {
+                console.warn('⚠️ NEXT_PUBLIC_OPENWEATHER_API_KEY não configurada');
+              }
+            } else {
+              console.warn('⚠️ Coordenadas não disponíveis no GeoJSON');
+            }
+            
+          } catch (error) {
+            console.error('❌ Erro ao buscar dados:', error);
+          }
+
+          // Calcula IRA automaticamente se houver todos os dados necessários
+          if (dadosBase.ndvi && dadosBase.umidade && dadosBase.chuva && dadosBase.temperatura) {
+            const ira = calcularIRA(
+              dadosBase.ndvi,
+              typeof dadosBase.umidade === 'number' ? dadosBase.umidade : parseFloat(String(dadosBase.umidade)),
+              typeof dadosBase.chuva === 'number' ? dadosBase.chuva : parseFloat(String(dadosBase.chuva)),
+              dadosBase.temperatura
+            );
+            dadosBase.ira = ira;
+            console.log(`📊 IRA calculado: ${ira} pontos`);
+          } else {
+            console.warn('⚠️ Dados insuficientes para calcular IRA');
+          }
+
+          // Envia dados (com ou sem dados das APIs)
+          onSelectLavoura(dadosBase);
         }
       },
     });
@@ -231,10 +394,19 @@ export default function MapaLavouras({ lavouras, onSelectLavoura, alertasCritico
         />
         
         {/* Controle de zoom automático */}
-        <MapController lavouras={lavouras} />
+        <MapController lavouras={lavouras} fazendaParaFocar={fazendaParaFocar} />
         
         {/* Overlay de imagens de satélite */}
         <SatelliteImageOverlay lavouras={lavouras} visualizationType={visualizationType} />
+        
+        {/* Camada de Precipitação (OpenWeather) */}
+        {showPrecipitation && (
+          <TileLayer
+            url={`https://tile.openweathermap.org/map/precipitation_new/{z}/{x}/{y}.png?appid=${process.env.NEXT_PUBLIC_OPENWEATHER_API_KEY}`}
+            opacity={0.4}
+            zIndex={500}
+          />
+        )}
         
         {lavouras.map((geo: any, i: number) => (
           <GeoJSON key={i} data={geo} onEachFeature={onEachFeature}>
@@ -312,27 +484,47 @@ export default function MapaLavouras({ lavouras, onSelectLavoura, alertasCritico
         </motion.div>
       )}
 
-      {/* Legenda de alertas */}
+      {/* Legenda IRA */}
       <motion.div
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.5, delay: 0.3 }}
         className="absolute top-3 right-3 bg-white rounded-lg shadow-md p-3 z-[1000]"
       >
-        <p className="text-xs font-semibold text-gray-700 mb-2">Legenda</p>
+        <p className="text-xs font-semibold text-gray-700 mb-2">Índice de Risco (IRA)</p>
         <div className="space-y-1.5">
           <div className="flex items-center gap-2">
-            <div className="w-6 h-3 rounded" style={{ backgroundColor: "#1B5E20" }}></div>
-            <span className="text-xs text-gray-600">Saudável</span>
+            <div className="w-6 h-3 rounded" style={{ backgroundColor: "#16a34a" }}></div>
+            <span className="text-xs text-gray-600">Ideal (≥70)</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-6 h-3 rounded" style={{ backgroundColor: "#F9A825" }}></div>
-            <span className="text-xs text-gray-600">Atenção</span>
+            <div className="w-6 h-3 rounded" style={{ backgroundColor: "#eab308" }}></div>
+            <span className="text-xs text-gray-600">Atenção (40-69)</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-6 h-3 rounded border-2 border-red-600 animate-pulse"></div>
-            <span className="text-xs font-semibold text-red-600">⚠️ Crítico</span>
+            <div className="w-6 h-3 rounded" style={{ backgroundColor: "#dc2626" }}></div>
+            <span className="text-xs font-semibold text-red-600">⚠️ Crítico (&lt;40)</span>
           </div>
+        </div>
+        
+        {/* Controle de Precipitação */}
+        <div className="mt-3 pt-3 border-t border-gray-200">
+          <button
+            onClick={() => setShowPrecipitation(!showPrecipitation)}
+            className={`flex items-center gap-2 w-full px-2 py-1.5 rounded text-xs transition-colors ${
+              showPrecipitation
+                ? 'bg-blue-500 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            <CloudRain className="w-3 h-3" />
+            Precipitação
+          </button>
+          {showPrecipitation && (
+            <p className="text-[10px] text-gray-500 mt-1 text-center">
+              🌧️ Tempo real
+            </p>
+          )}
         </div>
       </motion.div>
     </motion.div>

@@ -41,18 +41,8 @@ export async function getOpenWeatherData(lat = defaultCoordinates.lat, lon = def
       nuvens: data.clouds?.all || 0,
     };
   } catch (error) {
-    console.error('Erro ao buscar dados do OpenWeather:', error);
-    // Retorna dados de fallback
-    return {
-      temperatura: 25,
-      umidade_solo: 70,
-      chuva_semana: 15,
-      descricao: 'Dados indisponíveis',
-      vento: 0,
-      pressao: 1013,
-      sensacao_termica: 25,
-      nuvens: 0,
-    };
+    console.error('❌ Erro ao buscar dados do OpenWeather:', error);
+    throw new Error('Não foi possível obter dados meteorológicos. Verifique sua API key.');
   }
 }
 
@@ -183,67 +173,85 @@ export async function getNDVI() {
     try {
       const sentinelData = await getSentinelNDVI();
       if (sentinelData) {
+        console.log('✅ Usando dados reais do Sentinel-2');
         return {
           ndvi_atual: sentinelData.ndvi_atual,
           fonte: 'Sentinel-2',
-          historico: [
-            { data: '01/01', ndvi: 0.7 },
-            { data: '01/02', ndvi: 0.72 },
-            { data: '01/03', ndvi: sentinelData.ndvi_atual },
-          ]
+          historico: sentinelData.historico || []
         };
       }
     } catch (error) {
-      console.warn('Sentinel Hub falhou, tentando backend:', error);
+      console.warn('⚠️ Sentinel Hub falhou, tentando backend:', error);
     }
   }
 
-  // Fallback para backend
+  // Tenta backend
   try {
     const res = await fetch(`${API_BASE_URL}/ndvi`);
-    return res.json();
+    if (!res.ok) throw new Error(`Backend retornou ${res.status}`);
+    
+    const data = await res.json();
+    console.log('✅ Usando dados do backend');
+    return data;
   } catch (error) {
-    console.error('Erro ao buscar NDVI:', error);
-    // Dados de fallback
-    return {
-      ndvi_atual: 0.75,
-      fonte: 'simulado',
-      historico: [
-        { data: '01/01', ndvi: 0.7 },
-        { data: '01/02', ndvi: 0.72 },
-        { data: '01/03', ndvi: 0.75 },
-      ]
-    };
+    console.error('❌ Nenhuma fonte de dados NDVI disponível:', error);
+    throw new Error('Não foi possível obter dados NDVI. Configure Sentinel Hub ou backend.');
   }
 }
 
 export async function getWeather() {
+  // Prioriza OpenWeather (dados mais confiáveis)
   try {
-  const res = await fetch(`${API_BASE_URL}/weather`);
-  return res.json();
+    console.log('🌤️ Buscando dados do OpenWeather...');
+    const weatherData = await getOpenWeatherData();
+    console.log('✅ Dados meteorológicos obtidos do OpenWeather');
+    return weatherData;
   } catch (error) {
-    console.error('Erro ao buscar clima do backend:', error);
-    // Tenta OpenWeather como fallback
-    return await getOpenWeatherData();
+    console.warn('⚠️ OpenWeather falhou, tentando backend:', error);
+    
+    // Fallback para backend
+    try {
+      const res = await fetch(`${API_BASE_URL}/weather`);
+      if (!res.ok) throw new Error(`Backend retornou ${res.status}`);
+      
+      const data = await res.json();
+      console.log('✅ Dados meteorológicos obtidos do backend');
+      return data;
+    } catch (backendError) {
+      console.error('❌ Nenhuma fonte de dados meteorológicos disponível');
+      throw new Error('Não foi possível obter dados meteorológicos');
+    }
   }
 }
 
 export async function getAlerts() {
   try {
-  const res = await fetch(`${API_BASE_URL}/alerts`);
-  return res.json();
+    const res = await fetch(`${API_BASE_URL}/alerts`);
+    if (!res.ok) {
+      console.warn('⚠️ Backend de alertas não disponível');
+      return { alertas: [] };
+    }
+    const data = await res.json();
+    console.log('✅ Alertas obtidos do backend');
+    return data;
   } catch (error) {
-    console.error('Erro ao buscar alertas:', error);
+    console.warn('⚠️ Erro ao buscar alertas:', error);
     return { alertas: [] };
   }
 }
 
 export async function getYield() {
   try {
-  const res = await fetch(`${API_BASE_URL}/yield`);
-  return res.json();
+    const res = await fetch(`${API_BASE_URL}/yield`);
+    if (!res.ok) {
+      console.warn('⚠️ Backend de produtividade não disponível');
+      return {};
+    }
+    const data = await res.json();
+    console.log('✅ Dados de produtividade obtidos do backend');
+    return data;
   } catch (error) {
-    console.error('Erro ao buscar produtividade:', error);
+    console.warn('⚠️ Erro ao buscar produtividade:', error);
     return {};
   }
 }

@@ -9,16 +9,35 @@ import { getNDVI, getWeather, getAlerts, getYield, getOpenWeatherData } from "..
 import { AlertasLavoura } from "./AlertasLavoura";
 import "leaflet/dist/leaflet.css";
 
-// Componente do mapa com SSR desabilitado
+// Componentes com SSR desabilitado
 const MapaLavouras = dynamic(() => import("./MapaLavouras"), { ssr: false });
+const RankingFazendas = dynamic(() => import("./RankingFazendas"), { ssr: false });
+const RankingFazendasAvancado = dynamic(() => import("./RankingFazendasAvancado"), { ssr: false });
 
 // Interfaces para os dados do dashboard
 interface FarmData {
+  id?: string;
   nome: string;
   ndvi?: number;
   umidade?: number;
   temperatura?: number;
   chuva?: number;
+  area?: number;
+  latitude?: number;
+  longitude?: number;
+  ira?: number; // Índice de Risco Agrícola (0-100)
+  historicoNDVI?: Array<{
+    data: string;
+    ndvi: number;
+  }>;
+  historico?: number[]; // Histórico simplificado para gráfico no ranking
+  clima?: {
+    temperatura: number;
+    chuva: number;
+    condicao: string;
+    umidade: number;
+  };
+  geojson?: any; // GeoJSON da fazenda para centralizar o mapa
 }
 
 interface NDVIData {
@@ -204,6 +223,8 @@ export default function AgriMapDashboard() {
   const [fade, setFade] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [layers, setLayers] = useState<any[]>([]);
+  const [showRanking, setShowRanking] = useState(false);
+  const [fazendaParaFocar, setFazendaParaFocar] = useState<any>(null);
 
   const renderGeoJSON = (geojson: any) => {
     setLayers([geojson]); // Substitui camadas anteriores
@@ -214,6 +235,36 @@ export default function AgriMapDashboard() {
     setSelectedFarm(data.nome);
     setSelectedFarmData(data);
   };
+
+  const handleVerNoMapa = (fazenda: FarmData) => {
+    console.log("Ver no mapa:", fazenda);
+    setSelectedFarm(fazenda.nome);
+    setSelectedFarmData(fazenda);
+    setShowRanking(false); // Volta para o mapa
+    setFazendaParaFocar(fazenda.geojson); // Sinaliza para o mapa focar nesta fazenda
+  };
+
+  // Extrai lista de fazendas dos layers carregados
+  const listaFazendas = layers.flatMap((layer) => {
+    if (layer.type === 'FeatureCollection') {
+      return layer.features.map((feature: any) => {
+        // Gera histórico simplificado se disponível
+        const historico = feature.properties.historicoNDVI?.map((item: any) => item.ndvi) || [];
+        
+        return {
+          id: feature.properties.id || feature.properties.nome,
+          nome: feature.properties.nome || 'Sem nome',
+          ndvi: feature.properties.ndvi || 0,
+          umidade: feature.properties.umidade || 0,
+          ira: feature.properties.ira,
+          area: feature.properties.area_ha || feature.properties.area,
+          historico: historico.length > 0 ? historico : undefined,
+          geojson: feature, // GeoJSON completo da feature para focar no mapa
+        };
+      });
+    }
+    return [];
+  });
 
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -328,9 +379,15 @@ export default function AgriMapDashboard() {
             OpenWeather Ativo
           </motion.div>
         </div>
-        <Button variant="secondary" className="bg-white text-green-700 font-semibold hover:bg-green-50 shadow-md px-6">
-          + Nova Lavoura
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant={showRanking ? "default" : "secondary"} 
+            onClick={() => setShowRanking(!showRanking)}
+            className={`${showRanking ? 'bg-green-700 text-white' : 'bg-white text-green-700'} font-semibold hover:bg-green-50 shadow-md px-6`}
+          >
+            📊 {showRanking ? 'Ver Mapa' : 'Ver Ranking'}
+          </Button>
+        </div>
       </header>
 
       {/* Main grid */}
@@ -385,6 +442,7 @@ export default function AgriMapDashboard() {
               <MapaLavouras 
                 lavouras={layers} 
                 onSelectLavoura={handleSelectLavoura}
+                fazendaParaFocar={fazendaParaFocar}
               />
             ) : (
               <div className="flex items-center justify-center h-[700px] bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl">
@@ -580,6 +638,26 @@ export default function AgriMapDashboard() {
           </Card>
         </motion.div>
       </section>
+
+      {/* Ranking de Fazendas */}
+      {showRanking && listaFazendas.length > 0 && (
+        <section className="px-8 pb-8">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300 border border-gray-100">
+              <CardContent className="p-0">
+                <RankingFazendasAvancado 
+                  fazendas={listaFazendas}
+                  onVerNoMapa={handleVerNoMapa}
+                />
+              </CardContent>
+            </Card>
+          </motion.div>
+        </section>
+      )}
     </div>
   );
 }

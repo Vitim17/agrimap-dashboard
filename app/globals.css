@@ -123,3 +123,27 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Animações para alertas no mapa */
+@keyframes pulseBorder {
+  0% {
+    stroke-opacity: 0.3;
+  }
+  50% {
+    stroke-opacity: 1;
+  }
+  100% {
+    stroke-opacity: 0.3;
+  }
+}
+
+.leaflet-interactive.alerta-critico {
+  stroke: #dc2626 !important; /* vermelho */
+  stroke-width: 4px !important;
+  animation: pulseBorder 1.5s infinite ease-in-out;
+}
+
+.leaflet-interactive.alerta-moderado {
+  stroke: #eab308 !important; /* amarelo */
+  stroke-width: 3px !important;
+}
